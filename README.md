@@ -1,106 +1,296 @@
 # GalaxyMorph
 
-CNN-based galaxy morphology classification using the Galaxy10 DECaLS dataset and PyTorch.
+GalaxyMorph is a deep learning project for classifying galaxy morphology using the **Galaxy10 DECaLS** dataset and a convolutional neural network (CNN).
 
-## Project Goal
+## Final Result
 
-GalaxyMorph classifies galaxy images into 10 different morphological classes using a convolutional neural network (CNN).
+**Selected model:** Baseline CNN
+
+| Metric | Test Result |
+|---|---:|
+| Accuracy | **70.97%** |
+| Macro Precision | **73.75%** |
+| Macro Recall | **67.71%** |
+| Macro F1 | **67.43%** |
+| Weighted F1 | **69.00%** |
+
+The baseline outperformed all three experimental modifications tested.
+
+---
 
 ## Dataset
 
-Galaxy10 DECaLS.
+Galaxy10 DECaLS is a 10-class galaxy morphology classification dataset.
 
-- Training images: 15,962
-- Test images: 1,774
-- Image size: 256 × 256
-- Model input size: 128 × 128
-- Number of classes: 10
+| ID | Galaxy Morphology |
+|---:|---|
+| 0 | Disturbed |
+| 1 | Merging |
+| 2 | Round Smooth |
+| 3 | In-between Round Smooth |
+| 4 | Cigar Shaped Smooth |
+| 5 | Barred Spiral |
+| 6 | Unbarred Tight Spiral |
+| 7 | Unbarred Loose Spiral |
+| 8 | Edge-on without Bulge |
+| 9 | Edge-on with Bulge |
 
-## Tech Stack
+### Data split
 
-- Python
-- PyTorch
-- Torchvision
-- Hugging Face Datasets
-- NumPy
-- Scikit-learn
-- Matplotlib
+The original training data is split into **90% training / 10% validation** using seed `42`. The original test set remains completely held out for final evaluation.
 
-## Project Structure
-
-```text
-GalaxyMorph/
-├── datasets/
-├── models/
-│   └── best_model.pth
-├── src/
-│   ├── data.py
-│   ├── model.py
-│   └── train.py
-├── main.py
-├── pyproject.toml
-├── uv.lock
-└── README.md
-
-```
-
-## Model
-
-The current model is a custom CNN consisting of:
-
-- 3 convolutional blocks
-- ReLU activations
-- Max pooling
-- Fully connected classifier
-- Dropout
-
-### Input
-
-```text
-3 × 128 × 128
-```
-## Output
-```text
-10 classes
-```
-## Training
-
-Training is performed using:
-
-- Optimizer: Adam
-- Learning rate: 0.001
-- Loss: CrossEntropyLoss
-- Batch size: 32
-- Epochs: 10
-- GPU: NVIDIA GeForce RTX 4050 Laptop GPU
-
-## Results
-
-Initial CNN training:
-
-| Metric | Result |
+| Split | Batches |
 |---|---:|
-| Best validation accuracy | 72.32% |
-| Best epoch | 10 |
-| Training accuracy | 69.15% |
-| Validation loss | 0.8009 |
+| Training | 449 |
+| Validation | 50 |
+| Test | 56 |
 
-The best model is saved to:
+The test set contains **1,774 images**.
+
+---
+
+## Baseline CNN
+
+The final model contains three convolutional blocks:
+
+```text
+Input: 3 × 128 × 128
+
+Conv2D 3 → 32
+ReLU
+MaxPool
+
+Conv2D 32 → 64
+ReLU
+MaxPool
+
+Conv2D 64 → 128
+ReLU
+MaxPool
+
+Flatten
+Linear → 256
+ReLU
+Dropout(0.5)
+Linear → 10
+```
+
+### Training configuration
+
+| Parameter | Value |
+|---|---|
+| Image size | 128 × 128 |
+| Batch size | 32 |
+| Epochs | 10 |
+| Optimizer | Adam |
+| Learning rate | 0.001 |
+| Loss | CrossEntropyLoss |
+| Random seed | 42 |
+| GPU | NVIDIA GeForce RTX 4050 Laptop GPU |
+
+### Baseline augmentation
+
+Training images use:
+
+- Resize to 128 × 128
+- Random horizontal flip
+- Random vertical flip
+- Random rotation up to 20°
+- Tensor conversion
+
+Validation and test images use resizing and tensor conversion only.
+
+---
+
+# Experiments
+
+Three controlled experiments were evaluated against the baseline.
+
+| Experiment | Main Change | Accuracy | Precision | Recall | Macro F1 | Decision |
+|---|---|---:|---:|---:|---:|---|
+| **Baseline** | Standard CNN + CrossEntropyLoss | **70.97%** | **73.75%** | 67.71% | **67.43%** | **Selected** |
+| Experiment 1 | ColorJitter augmentation | 69.00% | 68.48% | 66.70% | 66.95% | Rejected |
+| Experiment 2 | Class-weighted CrossEntropyLoss | 67.64% | 65.14% | **69.64%** | 65.22% | Rejected |
+| Experiment 3 | Deeper CNN + BatchNorm | 60.15% | 58.09% | 52.20% | 50.98% | Rejected |
+
+### Experiment 1 — ColorJitter
+
+Added brightness, contrast, and saturation jitter to the training pipeline.
+
+Result: performance decreased from the baseline.
+
+### Experiment 2 — Class-weighted loss
+
+Replaced standard CrossEntropyLoss with inverse-frequency class weighting.
+
+Result: macro recall increased, but overall accuracy and macro F1 decreased.
+
+### Experiment 3 — Deeper CNN + BatchNorm
+
+Added a fourth convolutional block, increased the final convolutional width to 256 channels, and added BatchNorm.
+
+Result: performance decreased substantially.
+
+---
+
+# Final Classification Report
+
+| Galaxy Morphology | Precision | Recall | F1 Score | Support |
+|---|---:|---:|---:|---:|
+| Disturbed | 0.77 | 0.09 | 0.16 | 109 |
+| Merging | 0.79 | 0.76 | 0.77 | 185 |
+| Round Smooth | 0.80 | 0.92 | 0.85 | 250 |
+| In-between Round Smooth | 0.78 | 0.88 | 0.83 | 198 |
+| Cigar Shaped Smooth | 0.89 | 0.57 | 0.70 | 28 |
+| Barred Spiral | 0.62 | 0.73 | 0.67 | 217 |
+| Unbarred Tight Spiral | 0.55 | 0.63 | 0.59 | 179 |
+| Unbarred Loose Spiral | 0.55 | 0.47 | 0.51 | 273 |
+| Edge-on without Bulge | 0.88 | 0.80 | 0.84 | 157 |
+| Edge-on with Bulge | 0.75 | 0.92 | 0.82 | 178 |
+| **Macro Average** | **0.74** | **0.68** | **0.67** | **1774** |
+| **Weighted Average** | **0.71** | **0.71** | **0.69** | **1774** |
+
+---
+
+# Confusion Matrix
+
+The final confusion matrix is generated by the evaluation pipeline and saved to:
+
+```text
+results/confusion_matrix.png
+```
+
+Rows represent true classes and columns represent predicted classes.
+
+```text
+[[ 10  10  13  17   0  13   4  36   2   4]
+ [  0 141   8  14   0   1   1   7   3  10]
+ [  0   2 229   1   0   1  14   3   0   0]
+ [  0   6   8 174   0   0   4   5   0   1]
+ [  0   0   0   2  16   0   0   0   0  10]
+ [  0   6   5   4   1 159  22  18   1   1]
+ [  0   0  14   3   0  20 112  27   2   1]
+ [  2  12  11   5   0  60  46 128   3   6]
+ [  1   1   0   0   0   1   0   5 126  23]
+ [  0   1   0   3   1   1   0   2   6 164]]
+```
+
+---
+
+# Interpretation
+
+The model performs particularly well on:
+
+- Round Smooth
+- In-between Round Smooth
+- Edge-on without Bulge
+- Edge-on with Bulge
+- Merging
+
+The weakest class is **Disturbed**, with recall of only `0.09`.
+
+The model also struggles to distinguish several visually similar spiral classes, especially:
+
+- Barred Spiral
+- Unbarred Tight Spiral
+- Unbarred Loose Spiral
+
+These patterns are visible in the confusion matrix.
+
+---
+
+# Reproducibility
+
+The project uses `uv` for environment and dependency management.
+
+### Train
+
+```powershell
+uv run main.py
+```
+
+The training script loads the dataset, creates the train/validation/test split, trains the CNN, and saves the best checkpoint to:
 
 ```text
 models/best_model.pth
-
 ```
-## Running the Project
-```bash
-Install dependencies:
 
+### Evaluate
 
-uv sync
-
-Run training:
-
-
-uv run main.py
-
+```powershell
+uv run evaluation.py
 ```
+
+Evaluation reports:
+
+- Accuracy
+- Precision
+- Recall
+- Macro F1
+- Per-class metrics
+- Confusion matrix
+
+The confusion matrix is saved to:
+
+```text
+results/confusion_matrix.png
+```
+
+---
+
+# Project Structure
+
+```text
+Galaxymorph/
+│
+├── datasets/
+│   └── galaxy10_decals/
+│
+├── models/
+│   └── best_model.pth
+│
+├── results/
+│   └── confusion_matrix.png
+│
+├── src/
+│   ├── data.py
+│   ├── model.py
+│   ├── train.py
+│   └── evaluate.py
+│
+├── evaluation.py
+├── main.py
+├── README.md
+└── pyproject.toml
+```
+
+---
+
+# Experimental Conclusion
+
+The experiments show that increasing augmentation, adding class weighting, or increasing CNN depth did **not** improve performance for this setup.
+
+The baseline model achieved the best held-out test performance:
+
+> **70.97% accuracy and 0.6743 macro F1**
+
+Therefore, the baseline CNN was selected as the final model.
+
+The failed experiments remain preserved in Git so that the model-selection process is reproducible.
+
+---
+
+# Future Improvements
+
+Potential future work includes:
+
+- Transfer learning with pretrained image models
+- Learning-rate scheduling
+- More systematic hyperparameter search
+- Better handling of class imbalance
+- Targeted augmentation strategies
+- Misclassification analysis
+- Per-class sampling strategies
+- Grad-CAM or other explainability methods
+- Confidence calibration
+- Larger CNN architectures
