@@ -5,9 +5,27 @@ from src.model import GalaxyCNN
 from src.train import train_model
 
 
+SEED = 42
+
+
 def main():
 
-    print("Loading Galaxy10 DECaLS...\n")
+    # -----------------------------------------
+    # Reproducibility
+    # -----------------------------------------
+
+    torch.manual_seed(SEED)
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(SEED)
+
+    print(
+        f"Random seed: {SEED}"
+    )
+
+    print(
+        "\nLoading Galaxy10 DECaLS...\n"
+    )
 
     # -----------------------------------------
     # Load dataset
@@ -16,7 +34,7 @@ def main():
     (
         train_loader,
         test_loader,
-        train_dataset,
+        _,
     ) = create_dataloaders()
 
     print(
@@ -28,7 +46,7 @@ def main():
     )
 
     # -----------------------------------------
-    # Check GPU
+    # GPU
     # -----------------------------------------
 
     if not torch.cuda.is_available():
@@ -53,7 +71,6 @@ def main():
 
     model = GalaxyCNN()
 
-    # Move model to GPU
     model = model.to(device)
 
     # -----------------------------------------
@@ -64,13 +81,14 @@ def main():
         model=model,
         train_loader=train_loader,
         test_loader=test_loader,
-        train_dataset=train_dataset,
         epochs=10,
         learning_rate=0.001,
         device=device,
     )
 
-    print("\nTraining complete.")
+    print(
+        "\nTraining complete."
+    )
 
 
 if __name__ == "__main__":

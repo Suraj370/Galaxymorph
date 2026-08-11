@@ -2,28 +2,6 @@ import torch
 import torch.nn as nn
 
 
-def get_class_weights(dataset, num_classes=10):
-    """
-    Calculate class weights from the training dataset.
-
-    Classes with fewer examples receive a larger weight.
-    """
-
-    labels = dataset["label"]
-
-    counts = torch.bincount(
-        torch.tensor(labels),
-        minlength=num_classes,
-    ).float()
-
-    weights = 1.0 / counts
-
-    # Normalize weights so the average weight is 1.
-    weights = weights / weights.mean()
-
-    return weights
-
-
 def train_one_epoch(
     model,
     train_loader,
@@ -135,18 +113,14 @@ def train_model(
     model,
     train_loader,
     test_loader,
-    train_dataset,
     device,
     epochs=10,
     learning_rate=0.001,
 ):
     """
-    Train the CNN using class-weighted CrossEntropyLoss.
+    Train the baseline CNN using standard
+    CrossEntropyLoss.
     """
-
-    # -----------------------------------------
-    # History
-    # -----------------------------------------
 
     history = {
         "train_loss": [],
@@ -156,30 +130,10 @@ def train_model(
     }
 
     # -----------------------------------------
-    # Class weights
+    # Standard CrossEntropyLoss
     # -----------------------------------------
 
-    class_weights = get_class_weights(
-        train_dataset,
-        num_classes=10,
-    )
-
-    print("\nClass weights:")
-
-    for i, weight in enumerate(class_weights):
-        print(
-            f"Class {i}: {weight:.4f}"
-        )
-
-    class_weights = class_weights.to(device)
-
-    # -----------------------------------------
-    # Loss
-    # -----------------------------------------
-
-    criterion = nn.CrossEntropyLoss(
-        weight=class_weights,
-    )
+    criterion = nn.CrossEntropyLoss()
 
     # -----------------------------------------
     # Optimizer
@@ -213,11 +167,21 @@ def train_model(
             device=device,
         )
 
-        # Save history
-        history["train_loss"].append(train_loss)
-        history["train_accuracy"].append(train_accuracy)
-        history["val_loss"].append(val_loss)
-        history["val_accuracy"].append(val_accuracy)
+        history["train_loss"].append(
+            train_loss
+        )
+
+        history["train_accuracy"].append(
+            train_accuracy
+        )
+
+        history["val_loss"].append(
+            val_loss
+        )
+
+        history["val_accuracy"].append(
+            val_accuracy
+        )
 
         print(
             f"\nEpoch [{epoch + 1}/{epochs}]"
