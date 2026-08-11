@@ -2,6 +2,35 @@ import torch
 import torch.nn as nn
 
 
+# ============================================================
+# Class weights
+# ============================================================
+
+def get_class_weights(dataset, num_classes=10):
+    """
+    Calculate inverse-frequency class weights
+    from the training dataset.
+    """
+
+    labels = dataset["label"]
+
+    counts = torch.bincount(
+        torch.tensor(labels),
+        minlength=num_classes,
+    ).float()
+
+    weights = 1.0 / counts
+
+    # Normalize so average weight is 1.
+    weights = weights / weights.mean()
+
+    return weights
+
+
+# ============================================================
+# Train one epoch
+# ============================================================
+
 def train_one_epoch(
     model,
     train_loader,
@@ -9,6 +38,7 @@ def train_one_epoch(
     optimizer,
     device,
 ):
+
     model.train()
 
     running_loss = 0.0
@@ -44,7 +74,9 @@ def train_one_epoch(
             loss.item() * images.size(0)
         )
 
-        predictions = outputs.argmax(dim=1)
+        predictions = outputs.argmax(
+            dim=1
+        )
 
         correct += (
             predictions == labels
@@ -53,10 +85,15 @@ def train_one_epoch(
         total += labels.size(0)
 
     epoch_loss = running_loss / total
+
     epoch_accuracy = correct / total
 
     return epoch_loss, epoch_accuracy
 
+
+# ============================================================
+# Evaluate
+# ============================================================
 
 def evaluate(
     model,
@@ -64,6 +101,7 @@ def evaluate(
     criterion,
     device,
 ):
+
     model.eval()
 
     running_loss = 0.0
@@ -95,7 +133,9 @@ def evaluate(
                 loss.item() * images.size(0)
             )
 
-            predictions = outputs.argmax(dim=1)
+            predictions = outputs.argmax(
+                dim=1
+            )
 
             correct += (
                 predictions == labels
@@ -104,21 +144,27 @@ def evaluate(
             total += labels.size(0)
 
     epoch_loss = running_loss / total
+
     epoch_accuracy = correct / total
 
     return epoch_loss, epoch_accuracy
 
 
+# ============================================================
+# Train model
+# ============================================================
+
 def train_model(
     model,
     train_loader,
     validation_loader,
+    train_dataset,
     device,
     epochs=10,
     learning_rate=0.001,
 ):
     """
-    Train the baseline CNN using standard
+    Train the CNN using class-weighted
     CrossEntropyLoss.
     """
 
@@ -129,24 +175,48 @@ def train_model(
         "val_accuracy": [],
     }
 
-    # -----------------------------------------
-    # Standard CrossEntropyLoss
-    # -----------------------------------------
+    # --------------------------------------------------------
+    # Calculate class weights
+    # --------------------------------------------------------
 
-    criterion = nn.CrossEntropyLoss()
+    class_weights = get_class_weights(
+        train_dataset,
+        num_classes=10,
+    )
 
-    # -----------------------------------------
+    print("\nClass weights:")
+
+    for i, weight in enumerate(class_weights):
+
+        print(
+            f"Class {i}: {weight:.4f}"
+        )
+
+    # Move weights to GPU
+    class_weights = class_weights.to(
+        device
+    )
+
+    # --------------------------------------------------------
+    # Weighted loss
+    # --------------------------------------------------------
+
+    criterion = nn.CrossEntropyLoss(
+        weight=class_weights,
+    )
+
+    # --------------------------------------------------------
     # Optimizer
-    # -----------------------------------------
+    # --------------------------------------------------------
 
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=learning_rate,
     )
 
-    # -----------------------------------------
-    # Best model tracking
-    # -----------------------------------------
+    # --------------------------------------------------------
+    # Best model
+    # --------------------------------------------------------
 
     best_accuracy = 0.0
 
@@ -167,6 +237,10 @@ def train_model(
             device=device,
         )
 
+        # ----------------------------------------------------
+        # Save history
+        # ----------------------------------------------------
+
         history["train_loss"].append(
             train_loss
         )
@@ -182,6 +256,10 @@ def train_model(
         history["val_accuracy"].append(
             val_accuracy
         )
+
+        # ----------------------------------------------------
+        # Print results
+        # ----------------------------------------------------
 
         print(
             f"\nEpoch [{epoch + 1}/{epochs}]"
@@ -203,10 +281,9 @@ def train_model(
             f"  Val Accuracy:    {val_accuracy:.4f}"
         )
 
-        # -------------------------------------
-        # Save best model based ONLY on
-        # validation accuracy
-        # -------------------------------------
+        # ----------------------------------------------------
+        # Save best checkpoint
+        # ----------------------------------------------------
 
         if val_accuracy > best_accuracy:
 

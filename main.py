@@ -35,6 +35,7 @@ def main():
         train_loader,
         validation_loader,
         test_loader,
+        train_dataset,
     ) = create_dataloaders()
 
     print(
@@ -42,7 +43,8 @@ def main():
     )
 
     print(
-        f"Validation batches: {len(validation_loader)}"
+        f"Validation batches: "
+        f"{len(validation_loader)}"
     )
 
     print(
@@ -54,6 +56,7 @@ def main():
     # -----------------------------------------
 
     if not torch.cuda.is_available():
+
         raise RuntimeError(
             "CUDA is not available. "
             "PyTorch cannot use an NVIDIA GPU."
@@ -85,6 +88,7 @@ def main():
         model=model,
         train_loader=train_loader,
         validation_loader=validation_loader,
+        train_dataset=train_dataset,
         epochs=10,
         learning_rate=0.001,
         device=device,
