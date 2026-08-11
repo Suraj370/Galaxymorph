@@ -13,11 +13,10 @@ def main():
     # -----------------------------------------
 
     (
-    _,
-    _,
-    test_loader,
-    _,
-) = create_dataloaders()
+        _,
+        _,
+        test_loader,
+    ) = create_dataloaders()
 
     print(
         f"Test batches: {len(test_loader)}"
