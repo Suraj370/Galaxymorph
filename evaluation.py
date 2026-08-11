@@ -8,9 +8,14 @@ def main():
 
     print("Loading Galaxy10 DECaLS...\n")
 
-    _, test_loader = create_dataloaders()
+    # create_dataloaders now returns:
+    # train_loader, test_loader, train_dataset
 
-    print(f"Test batches: {len(test_loader)}")
+    _, test_loader, _ = create_dataloaders()
+
+    print(
+        f"Test batches: {len(test_loader)}"
+    )
 
     # -----------------------------------------
     # GPU
