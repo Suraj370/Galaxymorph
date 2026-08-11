@@ -100,13 +100,23 @@ def load_local_dataset():
 def get_transforms():
 
     train_transform = transforms.Compose([
-        transforms.Resize(
-            (IMAGE_SIZE, IMAGE_SIZE)
-        ),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.RandomRotation(20),
-        transforms.ToTensor(),
+    transforms.Resize(
+        (IMAGE_SIZE, IMAGE_SIZE)
+    ),
+
+    transforms.RandomHorizontalFlip(),
+
+    transforms.RandomVerticalFlip(),
+
+    transforms.RandomRotation(20),
+
+    transforms.ColorJitter(
+        brightness=0.2,
+        contrast=0.2,
+        saturation=0.2,
+    ),
+
+    transforms.ToTensor(),
     ])
 
     validation_transform = transforms.Compose([
