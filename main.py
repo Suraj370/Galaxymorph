@@ -33,12 +33,16 @@ def main():
 
     (
         train_loader,
+        validation_loader,
         test_loader,
-        _,
     ) = create_dataloaders()
 
     print(
         f"Train batches: {len(train_loader)}"
+    )
+
+    print(
+        f"Validation batches: {len(validation_loader)}"
     )
 
     print(
@@ -80,7 +84,7 @@ def main():
     model, history = train_model(
         model=model,
         train_loader=train_loader,
-        test_loader=test_loader,
+        validation_loader=validation_loader,
         epochs=10,
         learning_rate=0.001,
         device=device,

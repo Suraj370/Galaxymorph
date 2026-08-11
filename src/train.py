@@ -60,7 +60,7 @@ def train_one_epoch(
 
 def evaluate(
     model,
-    test_loader,
+    data_loader,
     criterion,
     device,
 ):
@@ -72,7 +72,7 @@ def evaluate(
 
     with torch.no_grad():
 
-        for batch in test_loader:
+        for batch in data_loader:
 
             images = batch["pixel_values"].to(
                 device,
@@ -112,7 +112,7 @@ def evaluate(
 def train_model(
     model,
     train_loader,
-    test_loader,
+    validation_loader,
     device,
     epochs=10,
     learning_rate=0.001,
@@ -162,7 +162,7 @@ def train_model(
 
         val_loss, val_accuracy = evaluate(
             model=model,
-            test_loader=test_loader,
+            data_loader=validation_loader,
             criterion=criterion,
             device=device,
         )
@@ -204,7 +204,8 @@ def train_model(
         )
 
         # -------------------------------------
-        # Save best model
+        # Save best model based ONLY on
+        # validation accuracy
         # -------------------------------------
 
         if val_accuracy > best_accuracy:

@@ -23,6 +23,12 @@ DATASET_PATH = Path(
 IMAGE_SIZE = 128
 BATCH_SIZE = 32
 
+# 90% training / 10% validation
+VALIDATION_SIZE = 0.10
+
+# Fixed seed for reproducible splitting
+SPLIT_SEED = 42
+
 
 # ============================================================
 # Galaxy10 classes
@@ -61,22 +67,27 @@ def load_local_dataset():
             Dataset.from_file(str(file_path))
         )
 
-    train_dataset = concatenate_datasets(train_datasets)
+    train_dataset = concatenate_datasets(
+        train_datasets
+    )
 
-    test_path = DATASET_PATH / "galaxy10_decals-test.arrow"
+    test_path = (
+        DATASET_PATH
+        / "galaxy10_decals-test.arrow"
+    )
 
-    test_dataset = Dataset.from_file(str(test_path))
+    test_dataset = Dataset.from_file(
+        str(test_path)
+    )
 
     dataset = DatasetDict({
         "train": train_dataset,
         "test": test_dataset,
     })
 
-    # Tell Hugging Face that the "image" column
-    # contains image data and should be decoded.
     dataset = dataset.cast_column(
         "image",
-        HFImage()
+        HFImage(),
     )
 
     return dataset
@@ -89,19 +100,34 @@ def load_local_dataset():
 def get_transforms():
 
     train_transform = transforms.Compose([
-        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+        transforms.Resize(
+            (IMAGE_SIZE, IMAGE_SIZE)
+        ),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.RandomRotation(20),
         transforms.ToTensor(),
     ])
 
-    test_transform = transforms.Compose([
-        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+    validation_transform = transforms.Compose([
+        transforms.Resize(
+            (IMAGE_SIZE, IMAGE_SIZE)
+        ),
         transforms.ToTensor(),
     ])
 
-    return train_transform, test_transform
+    test_transform = transforms.Compose([
+        transforms.Resize(
+            (IMAGE_SIZE, IMAGE_SIZE)
+        ),
+        transforms.ToTensor(),
+    ])
+
+    return (
+        train_transform,
+        validation_transform,
+        test_transform,
+    )
 
 
 # ============================================================
@@ -112,7 +138,25 @@ def create_dataloaders():
 
     dataset = load_local_dataset()
 
-    train_transform, test_transform = get_transforms()
+    (
+        train_transform,
+        validation_transform,
+        test_transform,
+    ) = get_transforms()
+
+    # --------------------------------------------------------
+    # Split original training data
+    # --------------------------------------------------------
+
+    split = dataset["train"].train_test_split(
+        test_size=VALIDATION_SIZE,
+        seed=SPLIT_SEED,
+    )
+
+    train_dataset = split["train"]
+    validation_dataset = split["test"]
+
+    test_dataset = dataset["test"]
 
     # --------------------------------------------------------
     # Training transformation
@@ -131,7 +175,23 @@ def create_dataloaders():
         }
 
     # --------------------------------------------------------
-    # Testing transformation
+    # Validation transformation
+    # --------------------------------------------------------
+
+    def transform_validation(example):
+
+        images = [
+            validation_transform(image)
+            for image in example["image"]
+        ]
+
+        return {
+            "pixel_values": images,
+            "label": example["label"],
+        }
+
+    # --------------------------------------------------------
+    # Test transformation
     # --------------------------------------------------------
 
     def transform_test(example):
@@ -150,11 +210,15 @@ def create_dataloaders():
     # Apply transformations
     # --------------------------------------------------------
 
-    train_dataset = dataset["train"].with_transform(
+    train_dataset = train_dataset.with_transform(
         transform_train
     )
 
-    test_dataset = dataset["test"].with_transform(
+    validation_dataset = validation_dataset.with_transform(
+        transform_validation
+    )
+
+    test_dataset = test_dataset.with_transform(
         transform_test
     )
 
@@ -168,10 +232,20 @@ def create_dataloaders():
         shuffle=True,
     )
 
+    validation_loader = DataLoader(
+        validation_dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=False,
+    )
+
     test_loader = DataLoader(
         test_dataset,
         batch_size=BATCH_SIZE,
         shuffle=False,
     )
 
-    return train_loader, test_loader, train_dataset
+    return (
+        train_loader,
+        validation_loader,
+        test_loader,
+    )

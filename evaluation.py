@@ -8,10 +8,15 @@ def main():
 
     print("Loading Galaxy10 DECaLS...\n")
 
-    # create_dataloaders now returns:
-    # train_loader, test_loader, train_dataset
+    # -----------------------------------------
+    # Load dataset
+    # -----------------------------------------
 
-    _, test_loader, _ = create_dataloaders()
+    (
+        train_loader,
+        validation_loader,
+        test_loader,
+    ) = create_dataloaders()
 
     print(
         f"Test batches: {len(test_loader)}"
@@ -45,7 +50,7 @@ def main():
     )
 
     # -----------------------------------------
-    # Evaluate
+    # Evaluate on REAL test set
     # -----------------------------------------
 
     evaluate_model(
