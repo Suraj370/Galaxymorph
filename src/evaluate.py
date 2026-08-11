@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import torch
 from sklearn.metrics import (
     accuracy_score,
@@ -25,14 +28,81 @@ CLASS_NAMES = [
 ]
 
 
-def evaluate_model(
-    model,
-    test_loader,
-    device,
-):
-    """
-    Evaluate the trained model on the test dataset.
-    """
+def load_best_model(device):
+    """Load the best saved CNN checkpoint."""
+
+    model = GalaxyCNN()
+
+    model.load_state_dict(
+        torch.load(
+            "models/best_model.pth",
+            map_location=device,
+        )
+    )
+
+    model = model.to(device)
+
+    return model
+
+
+def plot_confusion_matrix(matrix):
+    """Plot and save the confusion matrix."""
+
+    Path("results").mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    plt.figure(figsize=(12, 10))
+
+    plt.imshow(matrix)
+
+    plt.title("GalaxyMorph Confusion Matrix")
+    plt.xlabel("Predicted Class")
+    plt.ylabel("True Class")
+
+    plt.xticks(
+        range(len(CLASS_NAMES)),
+        CLASS_NAMES,
+        rotation=45,
+        ha="right",
+    )
+
+    plt.yticks(
+        range(len(CLASS_NAMES)),
+        CLASS_NAMES,
+    )
+
+    # Add values to each cell
+    for i in range(len(CLASS_NAMES)):
+        for j in range(len(CLASS_NAMES)):
+            plt.text(
+                j,
+                i,
+                matrix[i, j],
+                ha="center",
+                va="center",
+            )
+
+    plt.tight_layout()
+
+    output_path = "results/confusion_matrix.png"
+
+    plt.savefig(
+        output_path,
+        dpi=200,
+        bbox_inches="tight",
+    )
+
+    plt.close()
+
+    print(
+        f"\nConfusion matrix saved to: {output_path}"
+    )
+
+
+def evaluate_model(model, test_loader, device):
+    """Evaluate the model on the test dataset."""
 
     model.eval()
 
@@ -65,9 +135,9 @@ def evaluate_model(
                 labels.cpu().tolist()
             )
 
-    # -----------------------------------------
-    # Metrics
-    # -----------------------------------------
+    # -----------------------------
+    # Calculate metrics
+    # -----------------------------
 
     accuracy = accuracy_score(
         all_labels,
@@ -95,9 +165,9 @@ def evaluate_model(
         zero_division=0,
     )
 
-    # -----------------------------------------
-    # Print results
-    # -----------------------------------------
+    # -----------------------------
+    # Print overall results
+    # -----------------------------
 
     print("\nTest Results")
     print("=" * 50)
@@ -107,9 +177,9 @@ def evaluate_model(
     print(f"Recall:    {recall:.4f}")
     print(f"F1 Score:  {f1:.4f}")
 
-    # -----------------------------------------
+    # -----------------------------
     # Classification report
-    # -----------------------------------------
+    # -----------------------------
 
     print("\nClassification Report")
     print("=" * 70)
@@ -123,9 +193,9 @@ def evaluate_model(
         )
     )
 
-    # -----------------------------------------
+    # -----------------------------
     # Confusion matrix
-    # -----------------------------------------
+    # -----------------------------
 
     matrix = confusion_matrix(
         all_labels,
@@ -137,6 +207,12 @@ def evaluate_model(
 
     print(matrix)
 
+    # -----------------------------
+    # Save confusion matrix plot
+    # -----------------------------
+
+    plot_confusion_matrix(matrix)
+
     return {
         "accuracy": accuracy,
         "precision": precision,
@@ -144,22 +220,3 @@ def evaluate_model(
         "f1": f1,
         "confusion_matrix": matrix,
     }
-
-
-def load_best_model(device):
-    """
-    Load the best saved CNN checkpoint.
-    """
-
-    model = GalaxyCNN()
-
-    model.load_state_dict(
-        torch.load(
-            "models/best_model.pth",
-            map_location=device,
-        )
-    )
-
-    model = model.to(device)
-
-    return model
