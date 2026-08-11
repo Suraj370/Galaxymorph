@@ -174,4 +174,4 @@ def create_dataloaders():
         shuffle=False,
     )
 
-    return train_loader, test_loader
+    return train_loader, test_loader, train_dataset

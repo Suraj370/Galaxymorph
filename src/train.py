@@ -1,68 +1,94 @@
-from pathlib import Path
-
 import torch
 import torch.nn as nn
-import torch.optim as optim
 
 
-MODEL_PATH = Path("models/best_model.pth")
+def get_class_weights(dataset, num_classes=10):
+    """
+    Calculate class weights from the training dataset.
+
+    Classes with fewer examples receive a larger weight.
+    """
+
+    labels = dataset["label"]
+
+    counts = torch.bincount(
+        torch.tensor(labels),
+        minlength=num_classes,
+    ).float()
+
+    weights = 1.0 / counts
+
+    # Normalize weights so the average weight is 1.
+    weights = weights / weights.mean()
+
+    return weights
 
 
 def train_one_epoch(
     model,
     train_loader,
-    loss_function,
+    criterion,
     optimizer,
     device,
 ):
     model.train()
 
-    total_loss = 0.0
+    running_loss = 0.0
     correct = 0
     total = 0
 
     for batch in train_loader:
 
-        # Move batch to GPU
-        images = batch["pixel_values"].to(device, non_blocking=True)
-        labels = batch["label"].to(device, non_blocking=True)
+        images = batch["pixel_values"].to(
+            device,
+            non_blocking=True,
+        )
 
-        optimizer.zero_grad(set_to_none=True)
+        labels = batch["label"].to(
+            device,
+            non_blocking=True,
+        )
 
-        # Forward pass on GPU
+        optimizer.zero_grad()
+
         outputs = model(images)
 
-        # Loss on GPU
-        loss = loss_function(outputs, labels)
+        loss = criterion(
+            outputs,
+            labels,
+        )
 
-        # Backpropagation on GPU
         loss.backward()
 
-        # Update weights
         optimizer.step()
 
-        total_loss += loss.item()
+        running_loss += (
+            loss.item() * images.size(0)
+        )
 
         predictions = outputs.argmax(dim=1)
 
-        correct += (predictions == labels).sum().item()
+        correct += (
+            predictions == labels
+        ).sum().item()
+
         total += labels.size(0)
 
-    average_loss = total_loss / len(train_loader)
-    accuracy = correct / total
+    epoch_loss = running_loss / total
+    epoch_accuracy = correct / total
 
-    return average_loss, accuracy
+    return epoch_loss, epoch_accuracy
 
 
-def validate(
+def evaluate(
     model,
     test_loader,
-    loss_function,
+    criterion,
     device,
 ):
     model.eval()
 
-    total_loss = 0.0
+    running_loss = 0.0
     correct = 0
     total = 0
 
@@ -70,7 +96,6 @@ def validate(
 
         for batch in test_loader:
 
-            # Move validation batch to GPU
             images = batch["pixel_values"].to(
                 device,
                 non_blocking=True,
@@ -83,60 +108,45 @@ def validate(
 
             outputs = model(images)
 
-            loss = loss_function(outputs, labels)
+            loss = criterion(
+                outputs,
+                labels,
+            )
 
-            total_loss += loss.item()
+            running_loss += (
+                loss.item() * images.size(0)
+            )
 
             predictions = outputs.argmax(dim=1)
 
-            correct += (predictions == labels).sum().item()
+            correct += (
+                predictions == labels
+            ).sum().item()
+
             total += labels.size(0)
 
-    average_loss = total_loss / len(test_loader)
-    accuracy = correct / total
+    epoch_loss = running_loss / total
+    epoch_accuracy = correct / total
 
-    return average_loss, accuracy
+    return epoch_loss, epoch_accuracy
 
 
 def train_model(
     model,
     train_loader,
     test_loader,
+    train_dataset,
+    device,
     epochs=10,
     learning_rate=0.001,
-    device=None,
 ):
+    """
+    Train the CNN using class-weighted CrossEntropyLoss.
+    """
 
     # -----------------------------------------
-    # Select GPU
+    # History
     # -----------------------------------------
-
-    if device is None:
-
-        if not torch.cuda.is_available():
-            raise RuntimeError(
-                "CUDA GPU is not available. "
-                "Install a CUDA-enabled PyTorch build "
-                "or use a machine with an NVIDIA GPU."
-            )
-
-        device = torch.device("cuda")
-
-    print(f"Training device: {device}")
-
-    # Move entire model to GPU
-    model = model.to(device)
-
-    # Loss function
-    loss_function = nn.CrossEntropyLoss().to(device)
-
-    # Optimizer
-    optimizer = optim.Adam(
-        model.parameters(),
-        lr=learning_rate,
-    )
-
-    best_accuracy = 0.0
 
     history = {
         "train_loss": [],
@@ -145,35 +155,72 @@ def train_model(
         "val_accuracy": [],
     }
 
-    MODEL_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
+    # -----------------------------------------
+    # Class weights
+    # -----------------------------------------
+
+    class_weights = get_class_weights(
+        train_dataset,
+        num_classes=10,
     )
+
+    print("\nClass weights:")
+
+    for i, weight in enumerate(class_weights):
+        print(
+            f"Class {i}: {weight:.4f}"
+        )
+
+    class_weights = class_weights.to(device)
+
+    # -----------------------------------------
+    # Loss
+    # -----------------------------------------
+
+    criterion = nn.CrossEntropyLoss(
+        weight=class_weights,
+    )
+
+    # -----------------------------------------
+    # Optimizer
+    # -----------------------------------------
+
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=learning_rate,
+    )
+
+    # -----------------------------------------
+    # Best model tracking
+    # -----------------------------------------
+
+    best_accuracy = 0.0
 
     for epoch in range(epochs):
 
         train_loss, train_accuracy = train_one_epoch(
             model=model,
             train_loader=train_loader,
-            loss_function=loss_function,
+            criterion=criterion,
             optimizer=optimizer,
             device=device,
         )
 
-        val_loss, val_accuracy = validate(
+        val_loss, val_accuracy = evaluate(
             model=model,
             test_loader=test_loader,
-            loss_function=loss_function,
+            criterion=criterion,
             device=device,
         )
 
+        # Save history
         history["train_loss"].append(train_loss)
         history["train_accuracy"].append(train_accuracy)
         history["val_loss"].append(val_loss)
         history["val_accuracy"].append(val_accuracy)
 
         print(
-            f"Epoch [{epoch + 1}/{epochs}]"
+            f"\nEpoch [{epoch + 1}/{epochs}]"
         )
 
         print(
@@ -192,14 +239,17 @@ def train_model(
             f"  Val Accuracy:    {val_accuracy:.4f}"
         )
 
+        # -------------------------------------
         # Save best model
+        # -------------------------------------
+
         if val_accuracy > best_accuracy:
 
             best_accuracy = val_accuracy
 
             torch.save(
                 model.state_dict(),
-                MODEL_PATH,
+                "models/best_model.pth",
             )
 
             print(
@@ -207,15 +257,14 @@ def train_model(
                 f"({best_accuracy:.4f})"
             )
 
-        print()
-
     print(
-        f"Best validation accuracy: "
+        f"\nBest validation accuracy: "
         f"{best_accuracy:.4f}"
     )
 
     print(
-        f"Model saved at: {MODEL_PATH}"
+        "Model saved at: "
+        "models/best_model.pth"
     )
 
     return model, history
