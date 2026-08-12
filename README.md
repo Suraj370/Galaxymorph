@@ -22,6 +22,23 @@ The baseline outperformed all three experimental modifications tested.
 
 Galaxy10 DECaLS is a 10-class galaxy morphology classification dataset.
 
+### Data Source
+
+The dataset used in this project was obtained from the Hugging Face
+Datasets repository:
+
+- **Dataset:** `matthieulel/galaxy10_decals`
+- **Source:** https://huggingface.co/datasets/matthieulel/galaxy10_decals
+
+The project uses the provided training and test partitions. The training
+partition is further split into 90% training data and 10% validation data
+using a fixed random seed of `42`.
+
+The original test partition is kept completely separate and is used only
+for final model evaluation.
+
+### Galaxy Morphology Classes
+
 | ID | Galaxy Morphology |
 |---:|---|
 | 0 | Disturbed |
